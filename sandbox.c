@@ -38,9 +38,82 @@ We will test your code with very bad functions.
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
+#include <stdlib.h>
+
+void	do_nothing(int sig)
+{
+	(void)sig;
+}
 
 int	sandbox(void (*f)(void), unsigned int timeout, bool verbose)
-{}
+{
+	pid_t	pid;
+	struct sigaction sa = {0}; // to handle alarm signal, initialized to zeros
+	int	status;
+	pid_t	ret_pid;
+	pid = fork();
+	if (pid < 0)
+		return (-1);
+	if (pid == 0) // the only thing the child does:
+	{
+		alarm(timeout);
+		f();
+		exit(0);
+	}
+	// the main job is supposed to be done by parent (as usual):
+	sa.sa_handler = do_nothing; // replacement (if not set, sigalrm kills every process)
+	sigemptyset(&sa.sa_mask); // we clear signal mask, to prevent other signals block or delay
+	sa.sa_flags = 0; // since no one is killed yet, we reset flags (so waitpid wouldn't resume)
+	if (sigaction(SIGALRM, &sa, NULL) < 0) // actual special instruction for SIGALRM
+		return (-1);
+	alarm(timeout); // We need to stop in case the child hangs
+	ret_pid = waitpid(pid, &status, 0); // basically "wait", but tailored to a certain pid
+	if (ret_pid < 0) // Child was interrupted by timeout alarm
+	{
+		if (errno == EINTR) //EINTR means interrupted by a signal
+		{
+			kill(pid, SIGKILL); // killing the poor guy
+			waitpid(pid, NULL, 0); // we anyway collect the exit status of the child
+			if (verbose)
+				printf("Bad function: timed out after %u seconds\n", timeout);
+			return (0);
+		}
+		return (-1);
+	}
+	alarm(0);// if child exits normally, we don't need an alarm anymore
+	if (WIFEXITED(status)) // Child exited normally
+	{
+		int	code = WEXITSTATUS(status);
+		if (code == 0)
+		{
+			if (verbose)
+				printf("Nice function!\n");
+			return (1);
+		}
+		if (verbose)
+			printf("Bad function: exited with code %d\n", code);
+		return (0);
+	}
+	if (WIFSIGNALED(status)) // Child was killed by a signal
+	{
+		int	sig = WTERMSIG(status);
+		if (sig == SIGALRM)
+		{
+			if (verbose)
+				printf("Bad function: timed out after %u seconds\n", timeout);
+		}
+		else
+		{
+			if (verbose)
+				printf("Bad function: %s\n", strsignal(sig));
+		}
+		return (0);
+	}
+	struct sigaction reset = {0};
+	reset.sa_handler = SIG_DFL;
+	sigaction(SIGALRM, &reset, NULL);
+	return (-1);
+}
 
 
 void	ok_f(void)
