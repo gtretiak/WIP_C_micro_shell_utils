@@ -22,15 +22,14 @@ int main() {
 Hint: Do not leak file descriptors! */
 
 #include <stdio.h>
-#include <string.h>
-#include <fcntl.h>
-#include <unistd.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <sys/wait.h>
+#include <string.h>
 
-int	ft_popen(const char *file, char *const av[], char type)
+int	ft_popen(const char *file, char *const argv[], char type)
 {
-	if (!file || !av || (type != 'w' && type != 'r'))
+	if (!file || !argv || (type != 'w' && type != 'r'))
 		return (-1);
 	int	fd[2];
 	if (pipe(fd) < 0)
@@ -46,31 +45,30 @@ int	ft_popen(const char *file, char *const av[], char type)
 	{
 		if (type == 'r')
 		{
-			if (dup2(fd[1], STDOUT_FILENO) < 0)
-				exit (-1);
+			if (dup2(fd[1], 1) < 0)
+				exit(-1);
 		}
 		else
 		{
-			if (dup2(fd[0], STDIN_FILENO) < 0)
-				exit (-1);
+			if (dup2(fd[0], 0) < 0)
+				exit(-1);
 		}
 		close(fd[0]);
 		close(fd[1]);
-		execvp(file, av);
+		execvp(file, argv);
 		exit(-1);
 	}
 	if (type == 'r')
 	{
 		wait(NULL);
 		close(fd[1]);
-		return(fd[0]);
+		return (fd[0]);
 	}
 	else
 	{
 		close(fd[0]);
-		return(fd[1]);
+		return (fd[1]);
 	}
-
 }
 
 //test type 'r'
@@ -84,6 +82,7 @@ int main()
 		write(1, buf, 1);
 
 	close(fd);
+	wait(NULL);
 	return (0);
 } 
 /* 
@@ -97,9 +96,10 @@ int main()
 		return (0);
 	}
 	printf("File descriptor: %d\n", fd);
-    char *input = "Hello world\nThis is a test\nthird line mofo\n";
-    write(fd, input, strlen(input));
-    close(fd);
+	char *input = "Hello world\nThis is a test\nthird line mofo\n";
+	write(fd, input, strlen(input));
+	close(fd);
+	wait(NULL);
 	printf("after test\n");
     return (0);
 } */
