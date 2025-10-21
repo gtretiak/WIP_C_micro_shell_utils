@@ -32,6 +32,12 @@ We will test your code with very bad functions.
 */
 
 #include <stdbool.h>
+#include <unistd.h>
+#include <sys/wait.h>
+#include <signal.h>
+#include <stdio.h>
+#include <string.h>
+#include <errno.h>
 
 int	sandbox(void (*f)(void), unsigned int timeout, bool verbose)
 {}
